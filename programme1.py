@@ -12,6 +12,10 @@ import statsmodels.api as sm
 
 
 
+filename = "../data/spotify.csv"
+df = pd.read_csv(filename)
+
+
 try:
     print("--- 1. Chargement des données réussi ---")
     print(f"La base de données contient {df.shape[0]} lignes et {df.shape[1]} colonnes.\n")
