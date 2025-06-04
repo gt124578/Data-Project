@@ -27,6 +27,13 @@ except Exception as e:
     exit()
 
 
+#------- Comptage des tracks en fonction de la popularité ------
+count_popular=0
+for i in range(0,10):
+  count_popular += df[df['popularity'] == i].shape[0]
+print(f"Le nombre de morceaux populaires est : {count_popular}")
+
+
 
 # --- 2. Exploration Initiale des Données ---
 print("--- 2. Exploration Initiale des Données ---")
