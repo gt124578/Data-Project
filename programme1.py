@@ -38,6 +38,9 @@ print(f"Le nombre de morceaux populaires est : {count_popular}")
 
 # --- 2. Exploration Initiale des Données ---
 print("--- 2. Exploration Initiale des Données ---")
+#print("\n--- Aperçu des 5 premières lignes ---")
+#print(df.head())
+
 print("\n--- Informations sur les colonnes (types, valeurs non nulles) ---")
 df.info()
 
