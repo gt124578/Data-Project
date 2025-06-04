@@ -109,3 +109,125 @@ if len(numerical_cols) > 1:
     plt.show()
 else:
     print("Pas assez de colonnes numériques (>1) pour calculer une matrice de corrélation.")
+
+
+
+
+
+
+# --- 5. La popularité et les autres variables ---
+
+# Nous allons calculer la moyenne de popularité par genre et éventuellement la visualiser.
+
+if 'track_genre' in df_processed.columns and 'popularity' in df_processed.columns:
+    print("\n--- Analyse de la Popularité par Genre ---")
+
+    # Calculer la moyenne de popularité par genre
+    popularity_by_genre = df_processed.groupby('track_genre')['popularity'].mean().sort_values(ascending=False)
+
+    print("\nMoyenne de popularité par genre (Top 10):")
+    print(popularity_by_genre.head(10))
+
+    print("\nMoyenne de popularité par genre (Bottom 10):")
+    print(popularity_by_genre.tail(10))
+
+    # Visualisation de la popularité moyenne par genre (Top N)
+    top_n_genres = 20 # Nombre de genres à afficher
+    plt.figure(figsize=(14, 8))
+    popularity_by_genre.head(top_n_genres).plot(kind='bar')
+    plt.title(f'Popularité Moyenne par Genre (Top {top_n_genres})')
+    plt.xlabel('Genre Musical')
+    plt.ylabel('Popularité Moyenne')
+    plt.xticks(rotation=90)
+    plt.tight_layout()
+    plt.show()
+
+    # Vous pouvez également visualiser la popularité par genre en utilisant des boxplots
+    # pour voir la distribution, mais cela peut être très dense avec beaucoup de genres.
+    # Il est souvent préférable de sélectionner un sous-ensemble de genres.
+
+    # Exemple de boxplot pour un sous-ensemble de genres (les plus populaires par exemple)
+    genres_to_boxplot = popularity_by_genre.head(10).index.tolist()
+    df_subset_for_boxplot = df_processed[df_processed['track_genre'].isin(genres_to_boxplot)]
+
+    if not df_subset_for_boxplot.empty:
+        plt.figure(figsize=(15, 8))
+        sns.boxplot(x='track_genre', y='popularity', data=df_subset_for_boxplot)
+        plt.title('Distribution de la Popularité pour les Top 10 Genres')
+        plt.xlabel('Genre Musical')
+        plt.ylabel('Popularité')
+        plt.xticks(rotation=90)
+        plt.tight_layout()
+        plt.show()
+    else:
+        print("Le sous-ensemble de données pour le boxplot est vide.")
+
+
+    # Pour une "matrice de corrélation" entre une variable catégorielle (genre) et une numérique (popularity),
+    # la méthode standard est de calculer la moyenne/médiane de la variable numérique par catégorie.
+    # On ne calcule pas de coefficient de corrélation comme pour deux variables numériques.
+    # La visualisation de la popularité moyenne par genre (comme fait ci-dessus) est la manière standard de représenter cette relation.
+
+else:
+    print("Les colonnes 'track_genre' et/ou 'popularity' ne sont pas présentes dans le DataFrame.")
+
+
+
+
+# --- 6. Régression linéaire (Matrice de Graphiques) ---
+
+
+target_variables = numerical_cols
+feature_variables = numerical_cols
+n = len(numerical_cols)
+
+fig, ax = plt.subplots(n, n, figsize=(10*n, 10*n))
+
+if n == 1:
+    ax = np.array([[ax]])
+
+cmap = plt.get_cmap('coolwarm')
+norm = Normalize(vmin=-1, vmax=1)
+correlation_matrix = df_processed[numerical_cols].corr()
+
+
+for j, target_variable in enumerate(target_variables):
+    for i, feature_var in enumerate(feature_variables):
+        if target_variable == feature_var:
+
+            ax[j, i].text(0.5, 0.5, 'NA', ha='center', va='center', fontsize=12)
+            ax[j, i].set_axis_off()
+            continue
+        corr = correlation_matrix.loc[target_variable, feature_var]
+        color = cmap(norm(corr))
+        ax[j, i].set_facecolor(color)
+        ax[j, i].text(0.05, 0.95, f"ρ={corr:.2f}", transform=ax[j, i].transAxes,
+                      fontsize=14, color="black", va="top", ha="left", bbox=dict(facecolor='white', alpha=0.8, edgecolor='none'))
+        df_regression_subset = df_processed[[target_variable, feature_var]].copy().dropna()
+        X = df_regression_subset[[feature_var]]
+        y = df_regression_subset[target_variable]
+
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        model_sklearn = LinearRegression()
+        model_sklearn.fit(X_train, y_train)
+
+        ax[j, i].scatter(X_test, y_test, color='blue', label='Données réelles', alpha=0.5)
+        X_test_sorted = X_test.sort_values(by=feature_var)
+        y_pred_line = model_sklearn.predict(X_test_sorted)
+        ax[j, i].plot(X_test_sorted, y_pred_line, color='red', linewidth=2, label='Ligne de régression')
+
+        if j == n-1:
+            ax[j, i].set_xlabel(feature_var)
+        else:
+            ax[j, i].set_xlabel("")
+        if i == 0:
+            ax[j, i].set_ylabel(target_variable)
+        else:
+            ax[j, i].set_ylabel("")
+        ax[j, i].set_title(f"{target_variable} vs {feature_var}", fontsize=8)
+        ax[j, i].legend(fontsize=6)
+        ax[j, i].grid(True, linestyle='--', alpha=0.6)
+
+plt.tight_layout()
+plt.savefig('/content/drive/MyDrive/Python/dataset.csv')
+plt.show()
