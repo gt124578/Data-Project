@@ -14,6 +14,7 @@
     matplotlib
     seaborn
     scikit-learn
+    chardet
     ```
     Puis installez-les :
     ```bash
