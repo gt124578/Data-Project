@@ -185,60 +185,59 @@ else:
 # --- 6. Régression linéaire (Matrice de Graphiques) ---
 
 
-target_variables = numerical_cols
-feature_variables = numerical_cols
-n = len(numerical_cols)
-
-fig, ax = plt.subplots(n, n, figsize=(10*n, 10*n))
-
-if n == 1:
-    ax = np.array([[ax]])
-
-cmap = plt.get_cmap('coolwarm')
-norm = Normalize(vmin=-1, vmax=1)
-correlation_matrix = df_processed[numerical_cols].corr()
+import os
 
 
-for j, target_variable in enumerate(target_variables):
-    for i, feature_var in enumerate(feature_variables):
-        if target_variable == feature_var:
+for i in range(n):
+    feature_var = target_feature_variables[i][1]
+    target_variable = target_feature_variables[i][0]
+    cols_for_regression = [target_variable, feature_var]
+    df_regression_subset = df_processed[cols_for_regression].copy().dropna()
 
-            ax[j, i].text(0.5, 0.5, 'NA', ha='center', va='center', fontsize=12)
-            ax[j, i].set_axis_off()
-            continue
-        corr = correlation_matrix.loc[target_variable, feature_var]
-        color = cmap(norm(corr))
-        ax[j, i].set_facecolor(color)
-        ax[j, i].text(0.05, 0.95, f"ρ={corr:.2f}", transform=ax[j, i].transAxes,
-                      fontsize=14, color="black", va="top", ha="left", bbox=dict(facecolor='white', alpha=0.8, edgecolor='none'))
-        df_regression_subset = df_processed[[target_variable, feature_var]].copy().dropna()
-        X = df_regression_subset[[feature_var]]
-        y = df_regression_subset[target_variable]
+    if df_regression_subset.empty:
+        print(f"Skipping pair '{target_variable}' vs '{feature_var}' due to no valid data after dropna.")
+        continue
 
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-        model_sklearn = LinearRegression()
-        model_sklearn.fit(X_train, y_train)
+    X = df_regression_subset[[feature_var]]
+    y = df_regression_subset[target_variable]
 
-        ax[j, i].scatter(X_test, y_test, color='blue', label='Données réelles', alpha=0.5)
-        X_test_sorted = X_test.sort_values(by=feature_var)
-        y_pred_line = model_sklearn.predict(X_test_sorted)
-        ax[j, i].plot(X_test_sorted, y_pred_line, color='red', linewidth=2, label='Ligne de régression')
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-        if j == n-1:
-            ax[j, i].set_xlabel(feature_var)
+    model_sklearn = LinearRegression()
+    model_sklearn.fit(X_train, y_train)
+
+    df_test_sample = X_test.copy()
+    df_test_sample['target'] = y_test
+
+    if len(df_test_sample) > (len(df_test_sample) * sample_percentage if sample_percentage <= 1 else sample_percentage):
+        if sample_percentage <= 1:
+            df_test_sample = df_test_sample.sample(frac=sample_percentage, random_state=42)
         else:
-            ax[j, i].set_xlabel("")
-        if i == 0:
-            ax[j, i].set_ylabel(target_variable)
-        else:
-            ax[j, i].set_ylabel("")
-        ax[j, i].set_title(f"{target_variable} vs {feature_var}", fontsize=8)
-        ax[j, i].legend(fontsize=6)
-        ax[j, i].grid(True, linestyle='--', alpha=0.6)
+            df_test_sample = df_test_sample.sample(n=int(sample_percentage), random_state=42)
 
-plt.tight_layout()
-plt.savefig('/content/drive/MyDrive/Python/dataset.csv')
-plt.show()
+    X_test_sample = df_test_sample[[feature_var]]
+    y_test_sample = df_test_sample['target']
+
+    # Créer une nouvelle figure pour chaque plot (important !)
+    fig, current_ax = plt.subplots(figsize=(6, 6))
+
+    current_ax.scatter(X_test_sample, y_test_sample, color='blue', label=f'Données réelles', alpha=0.5)
+    x_line = np.linspace(X_test[feature_var].min(), X_test[feature_var].max(), 100).reshape(-1, 1)
+    y_pred_line = model_sklearn.predict(x_line)
+    current_ax.plot(x_line, y_pred_line, color='red', linewidth=2, label='Ligne de régression')
+    current_ax.set_xlabel(feature_var, alpha=0.5)
+    current_ax.set_ylabel(target_variable, alpha=0.5)
+    current_ax.set_title(f'Régression Linéaire Simple: {target_variable} vs {feature_var}')
+    current_ax.legend()
+    current_ax.grid(True, linestyle='--', alpha=0.6)
+    plt.tight_layout()
+
+    # Construire un nom de fichier explicite et enregistrer le plot
+    file_name = f"C:/Downloads/{target_variable}_vs_{feature_var}_regression.png"
+    plt.savefig(file_path)
+    plt.close(fig)  # Fermer la figure pour éviter les fuites de mémoire
+
+    print(f"Plot sauvegardé : {file_path}")
 
 
 
