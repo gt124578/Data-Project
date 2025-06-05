@@ -336,6 +336,9 @@ else:
 
 
 
+#Permet de créer les martices triangulaires supérieures des R², p-values et d'orientation
+
+
 if 'numerical_cols' not in globals() or not numerical_cols:
     print("Erreur : La liste 'numerical_cols' n'est pas définie ou est vide.")
     print("Veuillez définir 'numerical_cols' avec les noms des colonnes numériques à analyser.")
@@ -350,94 +353,91 @@ else:
 
     min_p_value_matrix = np.full((n, n), np.nan)
 
-    polynomial_degree = 2 
+    polynomial_degree = 2
 
     print("\nDébut de l'analyse de toutes les paires de variables...")
 
     # Boucler sur toutes les paires de variables (matrice triangulaire supérieure)
-    for i in range(n):
-        for j in range(i + 1, n): 
-            variable1 = numerical_cols[i]
-            variable2 = numerical_cols[j]
+for i in range(n):
+    for j in range(i + 1, n):
+        variable1 = numerical_cols[i]
+        variable2 = numerical_cols[j]
+        print(f"\nAnalyse de la paire : '{variable1}' vs '{variable2}'")
 
-            print(f"\nAnalyse de la paire : '{variable1}' vs '{variable2}'")
+        df_subset = df_processed[[variable1, variable2]].copy().dropna()
+        if df_subset.empty:
+            print(f"  Pas de données valides pour la paire '{variable1}' vs '{variable2}'.")
+            continue
 
- 
-            df_subset = df_processed[[variable1, variable2]].copy().dropna()
+        # --- Modèle 1: Prédire Variable1 (Y) à partir de Variable2 (X) ---
+        X1 = df_subset[[variable2]]
+        y1 = df_subset[variable1]
+        X1_train, X1_test, y1_train, y1_test = train_test_split(X1, y1, test_size=0.2, random_state=42)
 
-            if df_subset.empty:
-                print(f"  Pas de données valides pour la paire '{variable1}' vs '{variable2}'.")
-                continue
+        poly_features1 = PolynomialFeatures(degree=polynomial_degree)
+        X1_train_poly = poly_features1.fit_transform(X1_train)
+        X1_test_poly = poly_features1.transform(X1_test)
 
-            # --- Modèle 1: Prédire Variable1 (Y) à partir de Variable2 (X) ---
-            X1 = df_subset[[variable2]]
-            y1 = df_subset[variable1]
+        model1_sklearn = LinearRegression()
+        model1_sklearn.fit(X1_train_poly, y1_train)
+        y1_pred = model1_sklearn.predict(X1_test_poly)
+        r2_model1 = r2_score(y1_test, y1_pred)
 
-            X1_train, X1_test, y1_train, y1_test = train_test_split(X1, y1, test_size=0.2, random_state=42)
+        # Calcul du R² ajusté
+        n_test1 = X1_test_poly.shape[0]
+        p1 = X1_test_poly.shape[1] - 1  # -1 pour ne pas compter l'intercept
+        r2_adj_model1 = 1 - (1 - r2_model1) * (n_test1 - 1) / (n_test1 - p1 - 1)
 
-            # Transformation polynomiale
-            poly_features1 = PolynomialFeatures(degree=polynomial_degree)
-            X1_train_poly = poly_features1.fit_transform(X1_train)
-            X1_test_poly = poly_features1.transform(X1_test)
+        X1_train_sm = sm.add_constant(X1_train_poly)
+        model1_sm = sm.OLS(y1_train, X1_train_sm).fit()
+        p_values1 = model1_sm.pvalues
 
-            # Modèle scikit-learn pour R² 
-            model1_sklearn = LinearRegression()
-            model1_sklearn.fit(X1_train_poly, y1_train)
-            y1_pred = model1_sklearn.predict(X1_test_poly)
-            r2_model1 = r2_score(y1_test, y1_pred)
+        # --- Modèle 2: Prédire Variable2 (Y') à partir de Variable1 (X') ---
+        X2 = df_subset[[variable1]]
+        y2 = df_subset[variable2]
+        X2_train, X2_test, y2_train, y2_test = train_test_split(X2, y2, test_size=0.2, random_state=42)
 
-            # Modèle statsmodels pour les p-values 
-            X1_train_sm = sm.add_constant(X1_train_poly) 
-            model1_sm = sm.OLS(y1_train, X1_train_sm).fit()
-            p_values1 = model1_sm.pvalues 
+        poly_features2 = PolynomialFeatures(degree=polynomial_degree)
+        X2_train_poly = poly_features2.fit_transform(X2_train)
+        X2_test_poly = poly_features2.transform(X2_test)
 
-            # --- Modèle 2: Prédire Variable2 (Y') à partir de Variable1 (X') ---
-            X2 = df_subset[[variable1]] 
-            y2 = df_subset[variable2] 
+        model2_sklearn = LinearRegression()
+        model2_sklearn.fit(X2_train_poly, y2_train)
+        y2_pred = model2_sklearn.predict(X2_test_poly)
+        r2_model2 = r2_score(y2_test, y2_pred)
 
+        n_test2 = X2_test_poly.shape[0]
+        p2 = X2_test_poly.shape[1] - 1
+        r2_adj_model2 = 1 - (1 - r2_model2) * (n_test2 - 1) / (n_test2 - p2 - 1)
 
-            X2_train, X2_test, y2_train, y2_test = train_test_split(X2, y2, test_size=0.2, random_state=42)
+        X2_train_sm = sm.add_constant(X2_train_poly)
+        model2_sm = sm.OLS(y2_train, X2_train_sm).fit()
+        p_values2 = model2_sm.pvalues
 
-            # Transformation polynomiale
-            poly_features2 = PolynomialFeatures(degree=polynomial_degree)
-            X2_train_poly = poly_features2.fit_transform(X2_train)
-            X2_test_poly = poly_features2.transform(X2_test)
+        # --- Stocker les résultats ---
+        max_r2_adj = max(r2_adj_model1, r2_adj_model2)
+        r2_matrix[i, j] = max_r2_adj
 
-            # Modèle scikit-learn pour R² (sur test set)
-            model2_sklearn = LinearRegression()
-            model2_sklearn.fit(X2_train_poly, y2_train)
-            y2_pred = model2_sklearn.predict(X2_test_poly)
-            r2_model2 = r2_score(y2_test, y2_pred)
+        if r2_adj_model1 >= r2_adj_model2:
+            orientation_matrix[i, j] = f"Y={variable1}, X={variable2}"
+            best_p_values = p_values1
+        else:
+            orientation_matrix[i, j] = f"Y={variable2}, X={variable1}"
+            best_p_values = p_values2
 
-            # Modèle statsmodels pour les p-values (sur train set)
-            X2_train_sm = sm.add_constant(X2_train_poly) 
-            model2_sm = sm.OLS(y2_train, X2_train_sm).fit()
-            p_values2 = model2_sm.pvalues # Obtenir les p-values
+        if len(best_p_values) > 1:
+            min_p_value = best_p_values[1:].min()
+            min_p_value_matrix[i, j] = min_p_value
+        else:
+            min_p_value_matrix[i, j] = np.nan
 
-            # --- Stocker les résultats ---
-            max_r2 = max(r2_model1, r2_model2)
-            r2_matrix[i, j] = max_r2
+        print(f"  R² ajusté (Prédire {variable1} par {variable2}) : {r2_adj_model1:.4f}")
+        print(f"  R² ajusté (Prédire {variable2} par {variable1}) : {r2_adj_model2:.4f}")
+        print(f"  Meilleur R² ajusté : {max_r2_adj:.4f}")
+        print(f"  Meilleure orientation : {orientation_matrix[i, j]}")
+        print(f"  P-values pour la meilleure orientation : {best_p_values.tolist()}")
+        print(f"  Min P-value des termes (hors intercept) : {min_p_value:.4f}")
 
-            if r2_model1 >= r2_model2:
-                orientation_matrix[i, j] = f"Y={variable1}, X={variable2}"
-                best_p_values = p_values1
-            else:
-                orientation_matrix[i, j] = f"Y={variable2}, X={variable1}"
-                best_p_values = p_values2
-
-            # Trouver la p-value minimale parmi les coefficients
-            if len(best_p_values) > 1:
-                min_p_value = best_p_values[1:].min()
-                min_p_value_matrix[i, j] = min_p_value
-            else: 
-                 min_p_value_matrix[i, j] = np.nan 
-
-            print(f"  R² (Prédire {variable1} par {variable2}) : {r2_model1:.4f}")
-            print(f"  R² (Prédire {variable2} par {variable1}) : {r2_model2:.4f}")
-            print(f"  Meilleur R² : {max_r2:.4f}")
-            print(f"  Meilleure orientation : {orientation_matrix[i, j]}")
-            print(f"  P-values pour la meilleure orientation : {best_p_values.tolist()}")
-            print(f"  Min P-value des termes (hors intercept) : {min_p_value:.4f}")
 
 
     print("\nAnalyse terminée.")
@@ -475,7 +475,7 @@ else:
 
     sns.heatmap(r2_df,cmap='Reds',annot=True,fmt=".2f")       # Appliquer le masque pour n'afficher que la partie supérieure
 
-    plt.title('Heatmap des Meilleurs R² (Régression Polynomiale)')
+    plt.title('Heatmap des Meilleurs R² ajusté (Régression Polynomiale)')
     plt.xlabel('Variable (Axe des X potentiel)')
     plt.ylabel('Variable (Axe des Y potentiel)')
     plt.xticks(rotation=45, ha='right')
@@ -490,6 +490,20 @@ else:
     sns.heatmap(min_p_value_df,cmap='Reds',annot=True,fmt=".2f")
 
     plt.title('Heatmap des P-values Minimales (Termes hors Intercept)')
+    plt.xlabel('Variable (Axe des X potentiel)')
+    plt.ylabel('Variable (Axe des Y potentiel)')
+    plt.xticks(rotation=45, ha='right')
+    plt.yticks(rotation=0)
+    plt.tight_layout()
+    plt.show() # Affiche la deuxième heatmap
+
+    print("\n--- Heatmap correlation² vs R² ---")
+
+    plt.figure(figsize=(10, 8)) # Utilisez la même taille ou ajustez si nécessaire
+
+    sns.heatmap(((df_processed[numerical_cols].corr())**2)*10<r2_df,cmap='Reds',annot=True,fmt='d')
+
+    plt.title('Heatmap R²>correlation² (Termes hors Intercept)')
     plt.xlabel('Variable (Axe des X potentiel)')
     plt.ylabel('Variable (Axe des Y potentiel)')
     plt.xticks(rotation=45, ha='right')
