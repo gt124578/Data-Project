@@ -187,6 +187,8 @@ else:
 
 import os
 
+target_feature_variables = [['tempo', 'acousticness'], ['danceability', 'valence'], ['energy', 'loudness'], ['energy', 'acousticness'], ['loudness', 'acousticness'], ['loudness','instrumentalness'], ['loudness','valence'], ['tempo','energy'], ['tempo', 'acousticness'], ['danceability', 'acousticness']]
+
 
 for i in range(n):
     feature_var = target_feature_variables[i][1]
